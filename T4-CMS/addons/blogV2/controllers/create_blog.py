@@ -27,7 +27,7 @@ class BlogController(http.Controller):
 
         Args:
             domain: Domain của server Odoo
-            database: Tên database
+            database: Tên database # Ten database
             username: Tên đăng nhập
             password: Mật khẩu
 
