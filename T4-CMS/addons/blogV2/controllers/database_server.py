@@ -107,13 +107,14 @@ class DatabaseController(http.Controller):
             _logger.info(f'Response: {response}')
 
             if not response.get('result', False):
-                # Thuc hien login lại nếu lỗi session không hợp lệ
+                # Thuc hien login lại nếu lỗi session không hợp lệ,
+                
                 if response['status'] == '404': # NOT FOUND
                     session_id = self.action_login(
                         kw["domain"], kw["database"], kw["username"], kw["password"]
                     )
                     _logger.info(f'Session_id: {session_id}')
-                    headers.update({'Cookie': f'session_id={session_id}'})
+                    headers.update({'Cookie': f'session_id={session_id}'}) #Cập nhật session_id của header
 
                     response = self.callAPI(kw['domain'], headers, data)
                     _logger.info(f'Response callAPI: {response}')
