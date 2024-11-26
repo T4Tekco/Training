@@ -31,13 +31,13 @@ class DatabaseController(http.Controller):
         # Gửi yêu cầu đăng nhập
         session_data = requests.post(url, json=data)  # Gửi yêu cầu POST
         auth_response_data = session_data.json()
-        _logger.info(f'auth_response_data: {auth_response_data}')
+        #_logger.info(f'auth_response_data: {auth_response_data}')
 
         if not (auth_response_data.get("result") and auth_response_data["result"].get("uid")):
             return False
 
         session_id = session_data.cookies['session_id']
-        _logger.info(f'Session_id: {session_id}')
+        #_logger.info(f'Session_id: {session_id}')
         return session_id
 
     def callAPI(self, domain, headers, data):
@@ -107,14 +107,13 @@ class DatabaseController(http.Controller):
             _logger.info(f'Response: {response}')
 
             if not response.get('result', False):
-                # Thuc hien login lại nếu lỗi session không hợp lệ,
-                
+                # Thuc hien login lại nếu lỗi session không hợp lệ
                 if response['status'] == '404': # NOT FOUND
                     session_id = self.action_login(
                         kw["domain"], kw["database"], kw["username"], kw["password"]
                     )
                     _logger.info(f'Session_id: {session_id}')
-                    headers.update({'Cookie': f'session_id={session_id}'}) #Cập nhật session_id của header
+                    headers.update({'Cookie': f'session_id={session_id}'})
 
                     response = self.callAPI(kw['domain'], headers, data)
                     _logger.info(f'Response callAPI: {response}')
@@ -129,7 +128,7 @@ class DatabaseController(http.Controller):
 
     @http.route('/api/write/server_info', type='http', auth='user', methods=["POST"], csrf=False)
     def write_server_info(self, **kw):
-        _logger.info(f'Def write_server_info')
+        _logger.info(f'def write_server_info')
         try:
             # Login vào server từ xa
             session_id = self.action_login(
@@ -191,7 +190,6 @@ class DatabaseController(http.Controller):
             # Gửi yêu cầu POST tới server
             response = requests.post(
                 url, json={"jsonrpc": "2.0", "method": "call", "params": {}})
-            _logger.info(f'Response: {response}')
 
             if response.status_code == 200:  # Kiểm tra nếu phản hồi thành công
                 result = response.json().get('result', [])  # Lấy kết quả từ phản hồi
