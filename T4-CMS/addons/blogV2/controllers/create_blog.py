@@ -27,7 +27,7 @@ class BlogController(http.Controller):
 
         Args:
             domain: Domain của server Odoo
-            database: Tên database # Ten database
+            database: Tên database
             username: Tên đăng nhập
             password: Mật khẩu
 
@@ -68,6 +68,9 @@ class BlogController(http.Controller):
         Returns:
             str: Giá trị hash MD5 của hình ảnh
         """
+        _logger.info('def _get_image_hash')
+        _logger.info(f'image_hash: {hashlib.md5(image_data).hexdigest()}')
+
         return hashlib.md5(image_data).hexdigest()
 
     def _get_existing_attachment(self, login_params, original_url, domain, headers):
@@ -82,6 +85,7 @@ class BlogController(http.Controller):
         Returns:
             dict: Thông tin attachment nếu tồn tại, None nếu không
         """
+        _logger.info('def _get_existing_attachment')
         try:
             # Tìm attachment dựa trên URL gốc trong field description
             attachment = self.call_external_api(login_params,
@@ -94,6 +98,7 @@ class BlogController(http.Controller):
                                                 )
 
             if attachment.get("result"):
+                _logger.info(f'attachment["result"][0]: {attachment["result"][0]}')
                 return attachment["result"][0]
             return None
         except Exception as e:
@@ -114,6 +119,7 @@ class BlogController(http.Controller):
         Returns:
             str: URL của hình ảnh đã upload
         """
+        _logger.info('def _upload_image_to_server')
         try:
             # Kiểm tra attachment tồn tại
             existing_attachment = self._get_existing_attachment(
@@ -122,9 +128,11 @@ class BlogController(http.Controller):
 
             # Tính hash mới
             new_image_hash = self._get_image_hash(image_data)
+            _logger.info(f'new_image_hash: {new_image_hash}')
 
             # Kiểm tra nếu ảnh không thay đổi
             if existing_attachment and existing_attachment.get("checksum") == new_image_hash:
+                _logger.info(f"{domain}/web/image/{existing_attachment['id']}")
                 return f"{domain}/web/image/{existing_attachment['id']}"
 
             # Chuẩn bị dữ liệu attachment
@@ -136,6 +144,7 @@ class BlogController(http.Controller):
                 'res_model': 'ir.ui.view',
                 'description': original_url
             }
+            _logger.info(f'attachment_data: {attachment_data}')
 
             if existing_attachment:
                 # Cập nhật attachment cũ
@@ -160,7 +169,10 @@ class BlogController(http.Controller):
                     domain,
                     headers
                 )
+                _logger.info(f'attachment_response: {attachment_response}')
+
                 attachment_id = attachment_response["result"][0]
+                _logger.info(f'attachment_id: {attachment_id}')
 
             return f"/web/image/{attachment_id}"
         except Exception as e:
@@ -179,6 +191,7 @@ class BlogController(http.Controller):
         Returns:
             str: Nội dung đã xử lý với các URL hình ảnh mới
         """
+        _logger.info('def _process_images_in_content')
         if not content:
             return content
 
@@ -195,10 +208,13 @@ class BlogController(http.Controller):
             Returns:
                 str: Chuỗi đã được cập nhật URL hình ảnh.
             """
+            _logger.info('def replace_image')
             try:
                 # Kiểm tra và xử lý URL hình ảnh trong CSS background
+                
                 if "url('" in match.group(0):
                     image_url = match.group(1) # Lấy URL hình ảnh từ match
+                    _logger.info(f'image_url: {image_url}')
 
                     # Bỏ qua nếu URL đã hợp lệ (thuộc domain hoặc là đường dẫn tĩnh)
                     if domain in image_url or "/website/static/src" in image_url or "/web/image/website" in image_url:
@@ -206,13 +222,16 @@ class BlogController(http.Controller):
 
                     return f"url('{replace_image_url(login_params, image_url, db_name_local)}')" # Thay thế URL bằng hàm replace_image_url
 
-                # Xử lý URL hình ảnh trong thẻ <img>
+                # Xử lý URL hình ảnh trong thẻ <img>        
                 # Lấy toàn bộ thẻ img và giá trị src URL từ match
                 full_tag = match.group(0)
                 src_url = match.group(1)
+                _logger.info(f'full_tag: {match.group(0)}')
+                _logger.info(f'src_url: {match.group(1)}')
 
                 # Bỏ qua nếu URL đã hợp lệ (thuộc domain hoặc là đường dẫn tĩnh)
                 if domain in src_url or "/website/static/src" in src_url or "/web/image/website" in src_url:
+                    _logger.info(f'full_tag: {match.group(0)}')
                     return full_tag
 
                 # Gọi hàm replace_image_url để tạo URL mới
@@ -235,7 +254,8 @@ class BlogController(http.Controller):
                     # Nếu không có, thêm mới thuộc tính `data-original-src` với giá trị giống `src`
                     updated_tag = updated_tag.replace(
                         f'src="{new_url}"', f'src="{new_url}" data-original-src="{new_url}"')
-
+                
+                _logger.info(f'updated_tag: {updated_tag}')
                 return updated_tag # Trả về thẻ img đã được cập nhật
 
             except Exception as e:
@@ -248,13 +268,20 @@ class BlogController(http.Controller):
             """
             Thay thế URL hình ảnh bằng cách tải và upload lại lên server.
             """
+            _logger.info(f'def replace_image_url')
+
             try:
+                # Đăng ký với đối tượng Registry để thao tác với cơ sở dữ liệu db_name_local
                 registry = api.Registry(db_name_local)
-                with registry.cursor() as cr:
-                    env = api.Environment(cr, SUPERUSER_ID, {})
+
+                # Đảm bảo rằng con trỏ được tự động đóng khi khối lệnh hoàn thành, dù có xảy ra lỗi hay không.
+                with registry.cursor() as cr: #Tạo một con trỏ (cursor) để giao tiếp trực tiếp với cơ sở dữ liệu. cr là con trỏ dùng để truy vấn db
+                    env = api.Environment(cr, SUPERUSER_ID, {}) 
 
                     attachment = env['ir.attachment'].search(
                         [('image_src', '=', image_url)], limit=1)
+                    _logger.info(f'attachment: {attachment}')
+
                     if not attachment:
                         return None
                     image_data = base64.b64decode(attachment.datas)
@@ -280,6 +307,7 @@ class BlogController(http.Controller):
         content = re.sub(
             r'<img\s+[^>]*src="([^"]+)"[^>]*>', lambda m: replace_image(login_params, m, db_name_local), content)
 
+        _logger.info(f'content: {content}')
         return content
 
     def _clean_content(self, content):
@@ -292,30 +320,38 @@ class BlogController(http.Controller):
         Returns:
             str: Nội dung đã được làm sạch
         """
+        _logger.info('def _clean_content')
         # Kiểm tra nếu nội dung trống hoặc None, trả về chuỗi rỗng
         if not content:
             return ""
+        #_logger.info(f'before content: {content}')
 
         # Giải mã các ký tự HTML entities như &lt;, &gt;, &amp; thành ký tự thông thường
         content = html.unescape(content)
-
+        #_logger.info(f'before content: {content}')
+        
         # Thay thế các ký tự xuống dòng escaped (\\n) thành ký tự xuống dòng thực tế (\n)
         content = content.replace('\\n', '\n')
-
+        #_logger.info(f'content.replace: {content}')
+        
         # Sửa các URL của hình ảnh bị escaped
         # Ví dụ: url(\'image/path.jpg\') -> url('image/path.jpg')
         content = re.sub(r"url\(\\+'([^)]+)\\+'\)", r"url('\1')", content)
-
+        #_logger.info(f're.sub1: {content}')
+        
         # Loại bỏ các dòng trống thừa (nhiều dòng trống liên tiếp) chỉ để lại một dòng trống
         content = re.sub(r'\n\s*\n', '\n', content)
-
+        #_logger.info(f're.sub2: {content}')
+        
         # Xóa các khoảng trắng thừa ở đầu và cuối nội dung
         content = content.strip()
-
+        # _logger.info(f'content.strip: {content}')
+        
         # Thay thế các ký tự nháy đơn bị escaped (\\') thành nháy đơn thông thường (')
         content = content.replace("\\'", "'")
 
         # Trả về nội dung đã được làm sạch
+        #_logger.info(f'after content: {content}')
         return content
 
 
@@ -335,6 +371,7 @@ class BlogController(http.Controller):
         Returns:
             dict: Kết quả từ API
         """
+        _logger.info('def call_external_api')
         data = {
             "jsonrpc": "2.0",
             "method": "call",
@@ -349,9 +386,12 @@ class BlogController(http.Controller):
         try:
             response = requests.post(
                 f"{domain}/web/dataset/call_kw", headers=headers, json=data)
+            #_logger.info(f'response: {response}')
             # Kiểm tra HTTP status
             response.raise_for_status()  # Raise exception for 4XX/5XX status
             result = response.json()
+            
+            _logger.info(f'result: {result}')
 
             if result.get('error'):
                 _logger.error(f"Error fetching tags: {result['error']}")
@@ -362,20 +402,23 @@ class BlogController(http.Controller):
 
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
-                session = self.action_login(
+                session_id = self.action_login(
                     domain, login_params['database'], login_params['username'], login_params['password'])
+                _logger.info(f'session: {session_id}')
 
                 registry = api.Registry(login_params['db_name_local'])
                 with registry.cursor() as cr:
                     env = api.Environment(cr, SUPERUSER_ID, {})
                     env['server'].browse(int(login_params['server_id'])).write({
-                        'session': session,
+                        'session': session_id,
                     })
-                headers.update({'Cookie': f'session_id={session}'})
+
+                headers.update({'Cookie': f'session_id={session_id}'})
                 response = requests.post(
                     f"{domain}/web/dataset/call_kw", headers=headers, json=data)
                 # Kiểm tra HTTP status
                 result = response.json()
+                _logger.info(f'result: {result}')
 
                 if result.get('error'):
                     _logger.error(f"Error fetching tags: {result['error']}")
@@ -413,6 +456,7 @@ class BlogController(http.Controller):
         Returns:
             dict: Kết quả tạo/cập nhật blog
         """
+        _logger.info(f'create_blog API')
         try:
             required_fields = ['blog_folder', 'title', 'content', 'server_id',
                                'server_tag_ids', 'domain', 'database', 'session', 'username', 'password', 'db_name_local']
@@ -425,6 +469,7 @@ class BlogController(http.Controller):
 
             # Clean the content
             cleaned_content = self._clean_content(kw['content'])
+            _logger.info(f'cleaned_content: {cleaned_content}')
 
             if not kw['session']:
                 return {
@@ -442,24 +487,31 @@ class BlogController(http.Controller):
                 'db_name_local': kw['db_name_local'],
                 'server_id': kw['server_id']
             }
+            _logger.info(f'login_params: {login_params}')
+
             # Process and upload only modified images
             processed_content = self._process_images_in_content(
                 login_params, cleaned_content, kw['domain'], headers, kw['db_name_local'])
+            _logger.info(f'processed_content: {processed_content}')
 
             # Create/find blog folder
             blog_folder = self.call_external_api(login_params, "blog.blog", "search_read", [
                                                  "name", "=", kw["blog_folder"]], kw['domain'], headers, {"fields": ["id"]})
+            _logger.info(f'blog_folder: {blog_folder}')
 
             if blog_folder.get("result", []) == []:
                 blog_folder = self.call_external_api(login_params, "blog.blog", "create", {
                     'name': kw["blog_folder"]
                 }, kw['domain'], headers)
                 blog_folder["result"] = [{"id": blog_folder["result"][0]}]
+                _logger.info(f'blog_folder["result"]: {blog_folder["result"]}')
 
-            # Create/find blog post
+            # Tìm blog_post
             blog_post = self.call_external_api(login_params, "blog.post", "search_read", [
                 "name", "=", kw['title']], kw['domain'], headers, {"fields": ["id"]})
+            _logger.info(f'blog_post: {blog_post}')
 
+            # Trường hợp tạo blog_post thất bại -> gọi api tạo lại
             if blog_post.get("result", []) == []:
                 blog_post = self.call_external_api(login_params, "blog.post", "create", {
                     'blog_id': blog_folder.get("result")[0].get("id"),
@@ -467,6 +519,9 @@ class BlogController(http.Controller):
                     'content': processed_content
                 }, kw['domain'], headers)
                 blog_post["result"] = [{"id": blog_post["result"][0]}]
+                _logger.info(f'blog_post: {blog_post}')
+
+            # nếu tìm thấy thì cập nhật lại
             else:
                 self.call_external_api(login_params, "blog.post", "write", {
                     'blog_id': blog_folder.get("result")[0].get("id"),
@@ -475,12 +530,15 @@ class BlogController(http.Controller):
                 }, kw['domain'], headers, {}, blog_post["result"][0]['id'])
 
             blog_post_id = blog_post["result"][0]['id']
+            _logger.info(f'blog_post_id: {blog_post_id}')
 
             # Handle server tags
             try:
+                # cập nhật lại tag cho blog đó
                 self.call_external_api(login_params, "blog.post", "write", {
                     'tag_ids': [(6, 0, kw.get('server_tag_ids'))]
                 }, kw['domain'], headers, {}, blog_post_id)
+                _logger.info('Cập nhật tag cho blog thành công!!')
             except Exception as e:
                 return {
                     "message": f"Error adding server tag {str(e)}",
