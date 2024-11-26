@@ -78,10 +78,12 @@ class Server(models.Model):
                         'id': None
                     }
                     remote_tags = self.call_api(data, "/api/compute/sync/tag")
+                    
                     if not remote_tags:
                         record.server_tag_ids = [(6, 0, server_tag_ids)]
                         continue
-
+                    
+                    # lưu lại session
                     if remote_tags.get('session', False):
                         record.session = remote_tags['session']
 
@@ -192,11 +194,16 @@ class Server(models.Model):
 
         return base_url
 
+    # Hàm này cần xử lý để kiểm tra session có tồn tại hay không
     def call_api(self, data, url):
         # Lấy session của người dùng hiện tại
         session_cookie = request.httprequest.cookies.get(
             'session_id')
-        _logger.info(f'Session cookie call_api: {session_cookie}')
+        
+        # cookie phiên được sử dụng khi bạn gọi API từ phía client. 
+        # Cookie này thường được gửi kèm trong các yêu cầu HTTP (request) để duy trì phiên làm việc giữa client và server API.
+        # session của người dùng đăng nhập
+        #_logger.info(f'Session cookie call_api: {session_cookie}')
 
         # Chuẩn bị headers với session
         headers = {
@@ -209,8 +216,11 @@ class Server(models.Model):
         # Gọi API
         response = requests.post(url=f"{self.env['ir.config_parameter'].sudo().get_param('web.base.url')}{url}", json=data, timeout=30,  headers=headers,
                                  cookies=request.httprequest.cookies)
+        _logger.info(f"base_url: {self.env['ir.config_parameter'].sudo().get_param('web.base.url')}{url}")
+
         response_data = response.json()
         #_logger.info(f'Response data: {response_data.get("result", {})}')
+        _logger.info(f'response_data: {response_data}')
         
         # Đồng bộ tags từ server từ xa
         return response_data.get("result", {})
