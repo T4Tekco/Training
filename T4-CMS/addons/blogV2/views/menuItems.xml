@@ -1,0 +1,64 @@
+<odoo>
+    <data>
+        <menuitem id="blogTransfer" name="Blog Transfer" />
+
+        <!-- Blog Action -->
+        <record id="action_blog" model="ir.actions.act_window">
+            <field name="name">Blog</field>
+            <field name="res_model">blog.transfer</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+        <menuitem id="blog" name="Blog" parent="blogTransfer" action="action_blog" />
+
+        <record id="action_server_configuration" model="ir.actions.act_window">
+            <field name="name">Server</field>
+            <field name="res_model">server</field>
+            <field name="view_mode">tree,form</field>
+            <field name="target">current</field>
+            <field name="view_ids"
+                eval="[
+            (5, 0, 0),
+            (0, 0, {'view_mode': 'tree', 'view_id': ref('blogV2.server_tree_view')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('blogV2.server_view_form')})
+            ]" />
+        </record>
+        <menuitem id="configuration" name="Configuration" parent="blogTransfer" />
+        <menuitem id="server" name="Server" parent="configuration"
+            action="action_server_configuration"
+        />
+
+        <!-- Start Lịch chuyển blog -->
+
+        <record id="action_blog_transfer_scheduler" model="ir.actions.act_window">
+            <field name="name">Blog Transfer Schedules</field>
+            <field name="res_model">blog.transfer.scheduler</field>
+            <field name="view_mode">tree,form</field>
+        </record>
+
+        <!-- Menu -->
+        <menuitem id="menu_blog_transfer_scheduler"
+            name="Lịch chuyển blog"
+            parent="configuration"
+            action="action_blog_transfer_scheduler"
+            sequence="20" />
+
+        <!-- End Lịch chuyển blog -->
+
+
+            <record id="action_blog_transfer_kanban" model="ir.actions.server">
+            <field name="name">Blog Transfer Kanban</field>
+            <field name="model_id" ref="model_blog_transfer_kanban" />
+            <field name="state">code</field>
+            <field name="code">action = model.action_show()</field>
+        </record>
+
+        <!-- Menu -->
+        <menuitem id="menu_blog_transfer_kanban"
+            name="Kanban"
+            parent="configuration"
+            action="action_blog_transfer_kanban"
+            sequence="20" />
+
+    </data>
+</odoo>
