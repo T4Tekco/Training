@@ -35,8 +35,7 @@
 | Dùng khi nào        | Khi cần lưu dữ liệu nhạy cảm hoặc dữ liệu chỉ cần tồn tại trong phiên làm việc. | Khi cần lưu dữ liệu không nhạy cảm như tuỳ chọn giao diện hoặc thông tin đăng nhập. |
 
 
-
-## [MATCH.GROUP](https://stackoverflow.com/questions/2554185/match-groups-in-python)
+**MATCH.GROUP**
 - match.group() là gì?
 - match: Là đối tượng Match được tạo ra từ việc sử dụng hàm re.sub hoặc re.search khi áp dụng biểu thức chính quy (regex) trên chuỗi.
 - match.group(): Lấy dữ liệu tương ứng với từng nhóm được tìm thấy dựa trên biểu thức chính quy.
@@ -73,7 +72,7 @@ Regex:
 - Ví dụ, nếu chuỗi là:
 ``` <img src="https://example.com/image.jpg" alt="Example"> ```
 
-- group(0): <imgs src="https://example.com/image.jpg" alt="Example"> (toàn bộ thẻ).
+- group(0): <img src="https://example.com/image.jpg" alt="Example"> (toàn bộ thẻ).
 - group(1): https://example.com/image.jpg (URL trong src).
 
 ### Ý nghĩa của full_tag và src_url
@@ -87,5 +86,84 @@ Regex:
 - Lưu URL của hình ảnh được tìm thấy. Ví dụ:
 - https://example.com/image.jpg.
 
+## re.sub()
+```
+content = re.sub(
+    r"url\('([^']+)'\)", 
+    lambda m: replace_image(login_params, m, db_name_local), 
+    content
+)
+```
+
+### Phân tích các thành phần:
+### 1. re.sub():
+
+- re.sub() là một hàm trong module re (biểu thức chính quy) của Python, dùng để thay thế tất cả các chuỗi con khớp với một biểu thức chính quy trong chuỗi gốc bằng một giá trị thay thế.
+- Cấu trúc của hàm re.sub() là:
+
+```re.sub(pattern, repl, string)```
+
+- pattern: Biểu thức chính quy dùng để tìm các chuỗi con cần thay thế.
+- repl: Giá trị thay thế, có thể là một chuỗi hoặc một hàm (như ở đây là một hàm lambda).
+- string: Chuỗi cần thực hiện thay thế.
+
+### 2. r"url\('([^']+)'\)":
+
+- Đây là biểu thức chính quy được sử dụng để tìm kiếm các chuỗi có dạng url('...').
+- Giải thích biểu thức chính quy:
+    - url\(': Tìm chuỗi "url('" (có dấu nháy đơn) trong chuỗi văn bản.
+    - ([^']+): Đây là nhóm (group) số 1, tìm mọi ký tự ngoại trừ dấu nháy đơn ('), ít nhất một ký tự. Phần này sẽ khớp với URL bên trong dấu nháy đơn.
+    - '\): Tìm chuỗi đóng của ')'.
+- Biểu thức này sẽ khớp với các chuỗi có dạng url('https://example.com') hoặc bất kỳ URL nào ở dạng url('...').
+
+### 3. lambda m: replace_image(login_params, m, db_name_local):
+
+- Đây là một hàm lambda (hàm vô danh) sẽ được gọi mỗi khi một chuỗi con khớp với biểu thức chính quy được tìm thấy.
+- Hàm này nhận đối số m, là đối tượng Match mà re.sub() tạo ra khi tìm thấy một chuỗi con khớp.
+- Hàm lambda sẽ gọi hàm replace_image(login_params, m, db_name_local) và trả về giá trị của nó, cái này sẽ thay thế chuỗi con khớp trong content.
+
+### 4. replace_image(login_params, m, db_name_local):
+
+- Đây là một hàm (có thể do bạn tự định nghĩa) sẽ xử lý chuỗi con được tìm thấy và trả về giá trị thay thế.
+- Hàm này nhận ba tham số:
+    - login_params: Có thể là thông tin đăng nhập hoặc tham số cấu hình cần thiết để thay thế URL.
+    - m: Đối tượng Match chứa thông tin về chuỗi con khớp (ví dụ, URL trong url('...')).
+    - db_name_local: Có thể là tên cơ sở dữ liệu hoặc một tham số khác dùng trong hàm replace_image để thay đổi URL hoặc thực hiện thay thế.
+
 **LAMBDA FUNCTION**
-# lambda m: replace_image(login_params, m, db_name_local)
+### What is Lambda
+
+- lambda là một cú pháp đặc biệt trong Python để tạo ra một hàm ẩn danh (không có tên). Hàm lambda có thể nhận vào bất kỳ số lượng tham số và trả về một giá trị duy nhất.
+
+- Cú pháp:
+    ``` lambda arguments: expression ```
+
+- arguments: Danh sách các tham số mà hàm lambda nhận vào (có thể có một hoặc nhiều tham số, hoặc không có tham số nào).
+- expression: Biểu thức mà hàm sẽ tính toán và trả về. Chú ý rằng expression phải trả về một giá trị duy nhất.
+
+- Trong Odoo, sử dụng ```lambda``` thường được dùng để viết các hàm ngắn gọn mà không cần khai báo một hàm đầy đủ. 
+
+### Ví dụ cơ bản:
+1. Hàm lambda không tham số:
+```python
+greet = lambda: "Hello, world!"
+print(greet())  # Output: Hello, world! 
+```
+2. Hàm lambda với một tham số:
+```python
+square = lambda x: x * x
+print(square(5))  # Output: 25
+```
+3. Hàm lambda với nhiều tham số:
+```python
+add = lambda x, y: x + y
+print(add(3, 4))  # Output: 7
+```
+
+### Giải thích lambda m: replace_image(login_params, m, db_name_local):
+- lambda: Đây là một cách khai báo một hàm ẩn danh (không tên), giúp bạn tạo ra các hàm ngắn mà không cần phải dùng def.
+- m: Đây là đối số đầu vào của hàm lambda. Trong trường hợp này, nó sẽ nhận vào đối tượng match mà được truyền từ phương thức re.sub() (hoặc một phương thức tương tự).
+- replace_image(login_params, m, db_name_local): Đây là phần thực thi của hàm lambda. Nó sẽ gọi hàm replace_image với ba đối số:
+- login_params: Thông tin đăng nhập người dùng.
+- m: Đối số match được truyền từ biểu thức re.sub() (là kết quả của việc khớp với một biểu thức chính quy).
+- db_name_local: Tên cơ sở dữ liệu mà bạn đang làm việc với.
