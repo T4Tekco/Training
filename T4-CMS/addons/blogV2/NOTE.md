@@ -95,8 +95,8 @@ content = re.sub(
 )
 ```
 
-### Phân tích các thành phần:
-### 1. re.sub():
+# Phân tích các thành phần:
+# 1. re.sub():
 
 - re.sub() là một hàm trong module re (biểu thức chính quy) của Python, dùng để thay thế tất cả các chuỗi con khớp với một biểu thức chính quy trong chuỗi gốc bằng một giá trị thay thế.
 - Cấu trúc của hàm re.sub() là:
@@ -107,7 +107,7 @@ content = re.sub(
 - repl: Giá trị thay thế, có thể là một chuỗi hoặc một hàm (như ở đây là một hàm lambda).
 - string: Chuỗi cần thực hiện thay thế.
 
-### 2. r"url\('([^']+)'\)":
+# 2. r"url\('([^']+)'\)":
 
 - Đây là biểu thức chính quy được sử dụng để tìm kiếm các chuỗi có dạng url('...').
 - Giải thích biểu thức chính quy:
@@ -116,13 +116,13 @@ content = re.sub(
     - '\): Tìm chuỗi đóng của ')'.
 - Biểu thức này sẽ khớp với các chuỗi có dạng url('https://example.com') hoặc bất kỳ URL nào ở dạng url('...').
 
-### 3. lambda m: replace_image(login_params, m, db_name_local):
+# 3. lambda m: replace_image(login_params, m, db_name_local):
 
 - Đây là một hàm lambda (hàm vô danh) sẽ được gọi mỗi khi một chuỗi con khớp với biểu thức chính quy được tìm thấy.
 - Hàm này nhận đối số m, là đối tượng Match mà re.sub() tạo ra khi tìm thấy một chuỗi con khớp.
 - Hàm lambda sẽ gọi hàm replace_image(login_params, m, db_name_local) và trả về giá trị của nó, cái này sẽ thay thế chuỗi con khớp trong content.
 
-### 4. replace_image(login_params, m, db_name_local):
+# 4. replace_image(login_params, m, db_name_local):
 
 - Đây là một hàm (có thể do bạn tự định nghĩa) sẽ xử lý chuỗi con được tìm thấy và trả về giá trị thay thế.
 - Hàm này nhận ba tham số:
@@ -131,7 +131,7 @@ content = re.sub(
     - db_name_local: Có thể là tên cơ sở dữ liệu hoặc một tham số khác dùng trong hàm replace_image để thay đổi URL hoặc thực hiện thay thế.
 
 **LAMBDA FUNCTION**
-### What is Lambda
+# What is Lambda
 
 - lambda là một cú pháp đặc biệt trong Python để tạo ra một hàm ẩn danh (không có tên). Hàm lambda có thể nhận vào bất kỳ số lượng tham số và trả về một giá trị duy nhất.
 
@@ -143,7 +143,7 @@ content = re.sub(
 
 - Trong Odoo, sử dụng ```lambda``` thường được dùng để viết các hàm ngắn gọn mà không cần khai báo một hàm đầy đủ. 
 
-### Ví dụ cơ bản:
+# Ví dụ cơ bản:
 1. Hàm lambda không tham số:
 ```python
 greet = lambda: "Hello, world!"
@@ -167,3 +167,66 @@ print(add(3, 4))  # Output: 7
 - login_params: Thông tin đăng nhập người dùng.
 - m: Đối số match được truyền từ biểu thức re.sub() (là kết quả của việc khớp với một biểu thức chính quy).
 - db_name_local: Tên cơ sở dữ liệu mà bạn đang làm việc với.
+
+
+# FUNCTION IN PROJECT NOTE
+# 1. _clean_content(self, content)
+- xử lý và làm sạch nội dung văn bản đầu vào, chủ yếu là để chuẩn hóa các ký tự đặc biệt, định dạng HTML, và sửa chữa các lỗi phổ biến trong chuỗi. 
+
+### 1.1.Giải mã các thực thể HTML
+```bash
+content = html.unescape(content)
+```
+- Chuyển đổi các thực thể HTML (như &amp;, &lt;, &gt;) thành các ký tự tương ứng (&, <, >).
+- Ví dụ: "&amp;" sẽ được chuyển thành "&".
+
+### 1.2. Thay thế ký tự xuống dòng thoát (\n) bằng ký tự xuống dòng thực sự
+```bash
+content = content.replace('\\n', '\n')
+```
+- Chuyển đổi chuỗi thoát \n thành ký tự xuống dòng thực (newline).
+- Ví dụ: "Hello\\nWorld" sẽ trở thành "Hello\nWorld".
+
+### 1.3. Sửa các URL của ảnh
+```bash
+content = re.sub(r"url\(\\+'([^)]+)\\+'\)", r"url('\1')", content)
+```
+- Dùng Regular Expression (Regex) để sửa các URL ảnh bị thoát ký tự không đúng.
+- Ví dụ:
+```"url(\\+'https://example.com/image.png\\+')".```
+- Sẽ được chuyển thành ```"url('https://example.com/image.png')".```
+
+### 1.4. Chuẩn hóa các dòng trống
+```bash
+content = re.sub(r'\n\s*\n', '\n', content)
+```
+- Loại bỏ các dòng trống liên tiếp (dòng chứa toàn khoảng trắng hoặc nhiều dòng mới liên tiếp).
+```bash
+Line 1
+
+
+Line 2
+```
+
+Sẽ thành:
+
+```bash
+Line 1
+Line 2
+```
+
+### 1.5. Loại bỏ khoảng trắng thừa
+```python
+content = content.strip()
+```
+
+- Xóa khoảng trắng đầu và cuối chuỗi.
+- Ví dụ: " Hello World " sẽ trở thành "Hello World".
+
+### 1.6. Xử lý các ký tự thoát dấu nháy đơn (\')
+```python
+content = content.replace("\\'", "'")
+```
+- Chuyển đổi các dấu nháy đơn thoát (\') thành dấu nháy đơn thông thường (').
+- Ví dụ: ```"It\\'s fine"``` sẽ trở thành ```"It's fine"```
+
