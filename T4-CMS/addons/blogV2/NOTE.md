@@ -230,3 +230,29 @@ content = content.replace("\\'", "'")
 - Chuyển đổi các dấu nháy đơn thoát (\') thành dấu nháy đơn thông thường (').
 - Ví dụ: ```"It\\'s fine"``` sẽ trở thành ```"It's fine"```
 
+# **Trường checksum trong lớp ir.attachment của Odoo**
+- Trường checksum trong mô hình ir.attachment của Odoo được sử dụng để lưu trữ giá trị băm (hash) duy nhất của tệp đính kèm.
+- Đây là một chuỗi ký tự được tính toán từ nội dung của tệp.
+
+### Chức năng chính
+- Xác thực tính toàn vẹn của dữ liệu:
+    - Giá trị checksum giúp kiểm tra xem nội dung của tệp đính kèm có bị thay đổi hay không.
+    - Nếu nội dung thay đổi, giá trị checksum sẽ khác với giá trị ban đầu, cho phép phát hiện sự thay đổi không mong muốn.
+
+- Tránh lưu trữ tệp trùng lặp:
+    - Trước khi lưu một tệp mới, Odoo sẽ kiểm tra giá trị checksum.
+    - Nếu có tệp với cùng checksum, hệ thống sẽ tránh lưu lại nội dung trùng lặp, giúp tiết kiệm dung lượng lưu trữ.
+
+- Cách tính checksum
+    - Thông thường, giá trị này được tính bằng cách sử dụng thuật toán băm như SHA1 hoặc MD5 trên nội dung của tệp.
+
+- Tính chất của thuật toán băm:
+    - Các thuật toán băm như MD5, SHA1, hoặc SHA256 được thiết kế sao cho:
+    - Đầu vào giống nhau sẽ luôn tạo ra giá trị băm giống nhau.
+    - Đầu vào khác nhau sẽ tạo ra giá trị băm khác nhau.
+
+- Áp dụng cho hình ảnh:
+    - Nếu nội dung nhị phân của tệp ảnh không thay đổi (kích thước, màu sắc, metadata không bị chỉnh sửa), thì giá trị băm được tạo ra sẽ giống nhau mỗi khi bạn tính toán lại.
+- Điều này đảm bảo rằng bạn có thể sử dụng giá trị băm để:
+    - Xác minh tính toàn vẹn của tệp.
+    - So sánh hai tệp ảnh để kiểm tra xem chúng có phải là cùng một ảnh hay không.
