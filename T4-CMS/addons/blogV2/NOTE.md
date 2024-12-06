@@ -107,14 +107,78 @@ content = re.sub(
 - repl: Giá trị thay thế, có thể là một chuỗi hoặc một hàm (như ở đây là một hàm lambda).
 - string: Chuỗi cần thực hiện thay thế.
 
-# 2. r"url\('([^']+)'\)":
+- match.group(0) chứa toàn bộ chuỗi mà biểu thức chính quy (regex) đã khớp.
+- Dòng này kiểm tra xem chuỗi có chứa đoạn "url('" không. Điều này giúp xác định rằng đoạn mã hiện tại đang xử lý một CSS background image, ví dụ:
+
+- image_url = match.group(1):
+- Biểu thức chính quy (regex) ban đầu dùng để tìm chuỗi dạng url('<image_url>').
+- group(1) là nhóm (group) đầu tiên của regex được định nghĩa trong dấu ngoặc tròn () khi tạo regex. 
+- Nó thường chứa URL hình ảnh nằm bên trong url('<image_url>').
+
+Ví dụ, nếu chuỗi là:
+```css
+background-image: url('https://example.com/image.png'); 
+```
+thì group(0) sẽ là toàn bộ chuỗi "url('https://example.com/image.png')" và group(1) sẽ là "https://example.com/image.png".
+
+
+# 2. Biểu thức chính quy
+## 2.1. Biểu thức chính quy xử lý ảnh trong css (thuộc tính url)
+    ```css
+    r"url\('([^']+)'\)"
+    ```
 
 - Đây là biểu thức chính quy được sử dụng để tìm kiếm các chuỗi có dạng url('...').
 - Giải thích biểu thức chính quy:
+    - r"" đây là 1 chuỗi thô ký tự escape (như \n, \t) sẽ không được xử lý đặc biệt, mà sẽ được coi là các ký tự thông thường.
     - url\(': Tìm chuỗi "url('" (có dấu nháy đơn) trong chuỗi văn bản.
     - ([^']+): Đây là nhóm (group) số 1, tìm mọi ký tự ngoại trừ dấu nháy đơn ('), ít nhất một ký tự. Phần này sẽ khớp với URL bên trong dấu nháy đơn.
     - '\): Tìm chuỗi đóng của ')'.
 - Biểu thức này sẽ khớp với các chuỗi có dạng url('https://example.com') hoặc bất kỳ URL nào ở dạng url('...').
+
+## 2.2. Biểu thức chính quy xử lý ảnh trong html (thẻ img)
+```css
+<img: 
+```
+
+- Tìm kiếm chuỗi mở thẻ <img.
+- img là tên thẻ HTML, và biểu thức này sẽ tìm thẻ img trong HTML.
+```css
+\s+:
+```
+
+- Tìm một hoặc nhiều ký tự trắng (space, tab, newline, v.v.).
+- \s là biểu thị cho ký tự trắng, còn dấu + chỉ ra rằng cần ít nhất một ký tự trắng, nhưng có thể có nhiều hơn.
+- Phần này cho phép có khoảng trắng giữa <img và phần tiếp theo của thẻ.
+```css
+[^>]*:
+```
+
+- Tìm bất kỳ ký tự nào không phải là dấu >, và có thể xuất hiện bao nhiêu lần tùy ý.
+- [^>] là một nhóm phủ định, có nghĩa là "bất kỳ ký tự nào không phải là dấu lớn hơn (>)".
+- * chỉ ra rằng nhóm này có thể xuất hiện 0 hoặc nhiều lần. Phần này tìm tất cả các thuộc tính khác (nếu có) trong thẻ <img>, chẳng hạn như alt, - - width, height, hoặc bất kỳ thuộc tính nào khác mà không cần phải chỉ định chính xác.
+
+```css
+src=":
+```
+- Tìm chuỗi src=" trong thẻ <img>, đây là phần đánh dấu bắt đầu của thuộc tính src, nơi lưu trữ đường dẫn đến hình ảnh.
+```css
+([^"]+):
+```
+
+- Nhóm bắt (capture group) để trích xuất giá trị của thuộc tính src.
+- [^"] là nhóm phủ định, có nghĩa là "bất kỳ ký tự nào không phải là dấu nháy kép (")".
+- + chỉ ra rằng có ít nhất một ký tự không phải dấu nháy kép, và có thể có nhiều ký tự như vậy.
+- Tất cả những ký tự này sẽ được nhóm lại để trích xuất, tức là đường dẫn hình ảnh (URL) sẽ được thu vào nhóm này.
+
+```css
+"[^>]*>:
+```
+
+- Tìm dấu nháy kép đóng (") sau giá trị của src, và tiếp theo là bất kỳ ký tự nào không phải dấu >.
+- Điều này giúp tìm phần còn lại của thẻ <img>, bao gồm dấu nháy kép đóng của src và bất kỳ thuộc tính nào khác sau src, cho đến khi kết thúc thẻ >.
+- [^>]* tương tự như trước, cho phép thẻ <img> có các thuộc tính khác sau src.
+- Cuối cùng, > đóng lại thẻ <img>.
 
 # 3. lambda m: replace_image(login_params, m, db_name_local):
 
@@ -167,7 +231,6 @@ print(add(3, 4))  # Output: 7
 - login_params: Thông tin đăng nhập người dùng.
 - m: Đối số match được truyền từ biểu thức re.sub() (là kết quả của việc khớp với một biểu thức chính quy).
 - db_name_local: Tên cơ sở dữ liệu mà bạn đang làm việc với.
-
 
 # FUNCTION IN PROJECT NOTE
 # 1. _clean_content(self, content)
