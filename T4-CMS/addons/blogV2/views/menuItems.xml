@@ -1,5 +1,6 @@
 <odoo>
     <data>
+        <!-- Main Menu -->
         <menuitem id="blogTransfer" name="Blog Transfer" />
 
         <!-- Blog Action -->
@@ -9,56 +10,68 @@
             <field name="view_mode">tree,form</field>
         </record>
 
+        <!-- Blog Menu -->
         <menuitem id="blog" name="Blog" parent="blogTransfer" action="action_blog" />
 
+        <!-- Server Configuration -->
         <record id="action_server_configuration" model="ir.actions.act_window">
             <field name="name">Server</field>
             <field name="res_model">server</field>
             <field name="view_mode">tree,form</field>
-            <field name="target">current</field>
-            <field name="view_ids"
-                eval="[
-            (5, 0, 0),
-            (0, 0, {'view_mode': 'tree', 'view_id': ref('blogV2.server_tree_view')}),
-            (0, 0, {'view_mode': 'form', 'view_id': ref('blogV2.server_view_form')})
-            ]" />
+            <field name="view_ids" eval="[
+                (5, 0, 0),
+                (0, 0, {'view_mode': 'tree', 'view_id': ref('blogV2.server_tree_view')}),
+                (0, 0, {'view_mode': 'form', 'view_id': ref('blogV2.server_view_form')})
+            ]"/>
         </record>
+
+        <!-- Configuration Menu -->
         <menuitem id="configuration" name="Configuration" parent="blogTransfer" />
-        <menuitem id="server" name="Server" parent="configuration"
-            action="action_server_configuration"
-        />
+        <menuitem id="server" name="Server" parent="configuration" action="action_server_configuration" />
 
-        <!-- Start Lịch chuyển blog -->
-
+        <!-- Blog Transfer Scheduler -->
         <record id="action_blog_transfer_scheduler" model="ir.actions.act_window">
             <field name="name">Blog Transfer Schedules</field>
             <field name="res_model">blog.transfer.scheduler</field>
             <field name="view_mode">tree,form</field>
         </record>
 
-        <!-- Menu -->
         <menuitem id="menu_blog_transfer_scheduler"
-            name="Lịch chuyển blog"
-            parent="configuration"
-            action="action_blog_transfer_scheduler"
-            sequence="20" />
+                  name="Lịch chuyển blog"
+                  parent="configuration"
+                  action="action_blog_transfer_scheduler"
+                  sequence="20" />
 
-        <!-- End Lịch chuyển blog -->
-
-
-            <record id="action_blog_transfer_kanban" model="ir.actions.server">
-            <field name="name">Blog Transfer Kanban</field>
-            <field name="model_id" ref="model_blog_transfer_kanban" />
-            <field name="state">code</field>
-            <field name="code">action = model.action_show()</field>
+        <!-- Kanban View -->
+        <record id="view_publish_blog_kanban_tree" model="ir.ui.view">
+            <field name="name">blog.transfer.kanban.tree</field>
+            <field name="model">blog.transfer.kanban</field>
+            <field name="arch" type="xml">
+                <tree string="Blog Transfer Schedules">
+                    <field name="name" />
+                    <field name="nextcall" />
+                    <field name="interval_number" />
+                    <field name="interval_type" />
+                    <field name="user_id" />
+                    <field name="active" readonly="1" widget="boolean_toggle" />
+                    <field name="state" />
+                </tree>
+            </field>
         </record>
 
-        <!-- Menu -->
-        <menuitem id="menu_blog_transfer_kanban"
-            name="Kanban"
-            parent="configuration"
-            action="action_blog_transfer_kanban"
-            sequence="20" />
+        <!-- Kanban Action -->
+        <record id="action_publish_blog_kanban_2" model="ir.actions.act_window">
+            <field name="name">Publish Blog Schedules</field>
+            <field name="res_model">blog.transfer.kanban</field>
+            <field name="view_mode">tree,form</field>
+            <field name="view_id" ref="view_publish_blog_kanban_tree"/>
+        </record>
 
+        <!-- Kanban Menu -->
+        <menuitem id="menu_blog_transfer_kanban"
+                  name="Publish Blog Schedules"
+                  parent="configuration"
+                  action="action_publish_blog_kanban_2"
+                  sequence="10" />
     </data>
 </odoo>
