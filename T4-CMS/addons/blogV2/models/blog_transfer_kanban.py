@@ -1,7 +1,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 import logging
-import pytz
+import pytz # Import thư viện `pytz` để làm việc với múi giờ.
 from datetime import datetime, timedelta
 
 _logger = logging.getLogger(__name__)
@@ -12,21 +12,24 @@ class BlogTransferkanban(models.Model):
     _description = 'Blog Transfer kanban'
 
     name = fields.Char(string='Kanban', required=True)
-    blog_transfer_ids = fields.Many2many(
-        'blog.transfer',
-        'blog_transfer_kanban_rel',
+
+    blog_post_ids = fields.Many2many(
+        'blog.post',
+        'blog_post_kanban_ref',
         'kanban_id',
-        'transfer_id',
-        string='Các chiến dịch chuyển',
+        'blog_post_id',
+        string='Các bài viết',
         required=True
     )
 
+    # Liên kết với cron job, sẽ bị xóa nếu bản ghi này bị xóa.
     cron_id = fields.Many2one(
         'ir.cron',
         string='Scheduled Job',
         ondelete='cascade'
     )
 
+    # Khoảng thời gian lặp lại (số nguyên), mặc định là 1.
     interval_number = fields.Integer(
         default=1,
         string='Repeat Every',
@@ -41,6 +44,7 @@ class BlogTransferkanban(models.Model):
         ('months', 'Months')
     ], string='Interval Unit', default='days')
 
+    # Số lần gọi phương thức, mặc định là không giới hạn.
     numbercall = fields.Integer(
         string='Number of Calls',
         default=-1,
@@ -48,11 +52,13 @@ class BlogTransferkanban(models.Model):
              '-1 = no limit'
     )
 
+    # Cho phép thực hiện các lần bị bỏ lỡ khi server khởi động lại.
     doall = fields.Boolean(
         string='Repeat Missed',
         help="Specify if missed occurrences should be executed when the server restarts."
     )
 
+    # Thời gian thực hiện tiếp theo, được tính toán tự động.
     nextcall = fields.Datetime(
         string='Next Execution Date',
         readonly=False,
@@ -60,14 +66,14 @@ class BlogTransferkanban(models.Model):
         default=fields.Datetime.now,
     )
 
-    active = fields.Boolean(default=True)
-    user_id = fields.Many2one(
+    active = fields.Boolean(default=True)   # Trạng thái kích hoạt của bản ghi, mặc định là `True`.
+    user_id = fields.Many2one( # Người dùng tạo bản ghi, mặc định là người dùng hiện tại.
         'res.users',
         string='User',
         default=lambda self: self.env.user
     )
 
-    state = fields.Selection([
+    state = fields.Selection([   # Trạng thái của bản ghi, mặc định là `Nháp`.
         ('draft', 'Nháp'),
         ('running', 'Đang chạy'),
         ('done', 'Hoàn thành'),
@@ -75,6 +81,7 @@ class BlogTransferkanban(models.Model):
     ], string='Trạng thái', default='draft')
 
     def _compute_nextcall(self):
+        _logger.info('def _comute_nextcall')
         for record in self:
             if not record.cron_id:
                 record.nextcall = fields.Datetime.now()
@@ -82,7 +89,8 @@ class BlogTransferkanban(models.Model):
                 record.nextcall = record.cron_id.nextcall
 
     @api.model
-    def action_show(self):
+    def action_show(self):  # Phương thức mở form xem chi tiết bản ghi đầu tiên.
+        _logger.info('def action_show')
         form_view_id = self.env.ref(
             'blogV2.view_blog_transfer_kanban_form').id
         record = self.env['blog.transfer.kanban'].search([], limit=1)
@@ -98,44 +106,15 @@ class BlogTransferkanban(models.Model):
         }
         return action
 
-    @api.model
-    def _run_transfer_jobs_kanban(self):
-        """Phương thức được gọi bởi cron job để thực hiện các chiến dịch chuyển"""
-        kanbans = self.search([
-            ('active', '=', True)
-        ])
-        for kanban in kanbans:
-            _logger.info(kanban)
-            try:
-                # Đánh dấu các chiến dịch đang được xử lý
-                transfer_jobs = kanban.blog_transfer_ids.filtered(
-                    lambda x: x.state in ['draft', 'failed']
-                )
-                if transfer_jobs:
-                    _logger.info(
-                        f"Starting scheduled transfer for {kanban.name}")
-
-                    # Thực hiện chuyển cho từng chiến dịch
-                    for transfer in transfer_jobs:
-                        try:
-                            transfer.action_start_transfer()
-                        except Exception as e:
-                            _logger.error(
-                                f"Error processing transfer {transfer.name}: {str(e)}")
-                            continue
-
-                    kanban.write({'state': 'done'})
-
-            except Exception as e:
-                _logger.error(f"Error in kanban {kanban.name}: {str(e)}")
-
     def _prepare_cron_vals(self):
+        _logger.info('def _prepare_cron_vals')
         """Chuẩn bị giá trị cho cron job"""
+
         return {
             'name': f'Blog Transfer Schedule: {self.name}',
             'model_id': self.env['ir.model'].search([('model', '=', self._name)]).id,
             'state': 'code',
-            'code': 'model._run_transfer_jobs()',
+            'code': 'model._run_transfer_jobs()', # Cron job sẽ gọi phương thức này
             'user_id': self.user_id.id,
             'interval_number': self.interval_number,
             'interval_type': self.interval_type,
@@ -147,25 +126,24 @@ class BlogTransferkanban(models.Model):
     @api.model
     def create(self, vals):
         """Override create để tạo cron job khi tạo mới record"""
+        # Tạo bản ghi và cron job cho bản ghi đó
         record = super(BlogTransferkanban, self).create(vals)
-
         cron = self.env['ir.cron'].sudo().create(record._prepare_cron_vals())
+
+        # Gán cron job ID cho bản ghi và đánh dấu trạng thái là 'running'
         record.write({
             'cron_id': cron.id,
             'state': 'running'
         })
-        # Tạo cron job
-        cron = self.env['ir.cron'].sudo().create(record._prepare_cron_vals())
-        record.write({
-            'cron_id': cron.id,
-            'state': 'running'
-        })
-
         return record
+   
 
     def write(self, vals):
         """Override write để cập nhật cron job khi cập nhật record"""
+        # Gọi phương thức write gốc
         result = super(BlogTransferkanban, self).write(vals)
+
+        # Kiểm tra nếu trường 'active' không bị thay đổi, thì cập nhật các giá trị liên quan đến cron
         if vals.get('active', None) == None:
             for record in self:
                 # Kiểm tra các trường liên quan đến cron
@@ -174,6 +152,7 @@ class BlogTransferkanban(models.Model):
                     'doall', 'nextcall', 'active', 'user_id'
                 ]
 
+                # Nếu có trường nào liên quan đến cron được thay đổi, sửa đổi cron job
                 if any(field in vals for field in cron_related_fields):
                     if record.cron_id:
                         # Cập nhật cron job hiện tại
@@ -193,23 +172,95 @@ class BlogTransferkanban(models.Model):
         for record in self:
             if record.cron_id:
                 record.cron_id.unlink()
-        return super(BlogTransferkanban, self).unlink()
+        return super(BlogTransferkanban, self).unlink()     # Gọi phương thức unlink gốc
 
     def action_deactivate(self):
         """Hủy kích hoạt lập lịch chuyển"""
         if self.cron_id:
             _logger.info(self.cron_id)
-            self.cron_id.write({'active': False})
+            self.cron_id.write({'active': False})  # Đánh dấu cron job là không hoạt động
         self.write({
             'state': 'cancelled',
             'active': False
         })
 
     def action_activate(self):
+        _logger.info(f'def action_activate')
         """Kích hoạt lập lịch chuyển"""
         if self.cron_id:
             self.cron_id.write({'active': True})
-        self.write({
+        self.write({   # Cập nhật trạng thái thành 'running' và 'active' thành True
             'state': 'running',
             'active': True
         })
+
+
+    @api.model
+    def _run_transfer_jobs(self):
+        _logger.info('def _run_transfer_jobs_kanban')
+        """Phương thức được gọi bởi cron job để thực hiện các chiến dịch chuyển"""
+        # Lấy tất cả các Kanban blog đang hoạt động
+        kanbans = self.search([
+            ('active', '=', True)
+        ])
+
+        _logger.info(f'kanbans: {kanbans}')
+        for kanban in kanbans:
+            _logger.info(kanban)
+            try:
+
+                blog_posts = kanban.blog_post_ids.filtered(
+                    lambda x: x.is_published == False
+                )
+
+                _logger.info(f'blog_post arr: {blog_posts}')
+
+                if blog_posts:
+                    
+                    # Thực hiện chuyển cho từng chiến dịch
+                    for blog_post in blog_posts:
+                        _logger.info(f'Ten blog_post: {blog_post.name}')
+                        try:
+                            self.action_start_publish(blog_post)
+                        except Exception as e:
+                            _logger.error(
+                                f"Error processing blog_post {blog_post.name}: {str(e)}")
+                            continue
+                    
+                    # Đánh dấu kanban là 'done' sau khi hoàn tất chuyển
+                    kanban.write({'state': 'done'})
+
+            except Exception as e:
+                _logger.error(f"Error in kanban {kanban.name}: {str(e)}")
+
+
+    def action_start_publish(self, blog_post):
+        _logger.info('def action_start_publish')
+
+        # Kiểm tra nếu blog_post không tồn tại
+        if not blog_post:
+            _logger.info('Blog post is not provided or invalid.')
+            return
+
+        try:
+            blog_post.write({
+                'is_published': True
+                })
+            _logger.info(f"Blog post '{blog_post.name}' has been published.")
+        except Exception as e:
+            _logger.error(f"Exception occurred when updating blog post: {str(e)}")
+
+
+    # def action_start_publish(self, blog_post):
+    #     _logger.info('def action_start_publish')
+
+    #     try: 
+    #         if blog_post:
+    #             if not blog_post.is_published:
+    #                 blog_post.write({
+    #                     'is_published': True
+    #                 })
+    #             _logger.info(f'blog_post.is_published: {blog_post.is_published}')
+    #     except Exception as e: 
+    #         _logger.info(f'Exception occured when write blog_post: {str(e)}')
+
