@@ -79,8 +79,7 @@ class BlogController(http.Controller):
         except Exception as e:
             _logger.error(f"Error uploading/creating new attachment with error: {str(e)}")
             return None
-        
-        
+          
     def _get_attachment_url_path(self, login_params, attachment_response, domain, headers):
         _logger.info('def _get_attachment_url_path')
         try:
@@ -110,10 +109,8 @@ class BlogController(http.Controller):
                 _logger.error(f"Failed to get attachment details for {attachment_server_id}")
                 return None
 
-            # Assuming the URL is in the first item of the result list
             attachment_details = attachment_detail.get('result', [{}])[0]
             
-            # Try to get the URL path
             attachment_url_path = attachment_details.get('image_src')
             
             if not attachment_url_path:
@@ -126,143 +123,6 @@ class BlogController(http.Controller):
         except Exception as e:             
             _logger.error(f'Error when get attachment_url_path: {str(e)}')             
             return None
-
-    # def _process_images_in_content(self, login_params, content, domain, headers, db_name_local):
-    #     _logger.info('def _process_image_in_content============================')
-    #     _logger.info(f"Processing images for blog post id [{login_params['blog_post_id']}] was RUNNING")
-    #     #_logger.info(f"Thread _process_images_in_content for blog post id [{login_params['blog_post_id']}] is RUNNING")
-
-    #     if not content:
-    #         return content
-
-    #     def replace_image(login_params, match, db_name_local):
-    #         _logger.info('def replace_image--------------------')
-    #         try:
-    #             # CSS background image handling
-    #             if "url('" in match.group(0):
-    #                 image_url = match.group(1)
-    #                 _logger.info(f'image url: {image_url}')
-    #                 if _is_local_image(domain, image_url):
-    #                     _logger.info(f'is local image: {_is_local_image(domain, image_url)}')
-    #                     return match.group(0)
-    #                 return f"url('{replace_image_url(login_params, image_url, db_name_local)}')"
-
-    #             # img tag handling
-    #             full_tag = match.group(0)
-    #             src_url = match.group(1)
-    #             _logger.info(f'full_tag: {full_tag}')
-    #             _logger.info(f'src_tag: {src_url}')
-
-    #             if _is_local_image(domain, src_url):
-    #                 return full_tag
-
-    #             new_url = replace_image_url(login_params, src_url, db_name_local)
-    #             _logger.info(f'new_url: {new_url}')
-    #             if not new_url:
-    #                 return full_tag
-                
-    #             _logger.info(f'_update_image_tag: {_update_image_tag(full_tag, new_url)}')
-    #             return _update_image_tag(full_tag, new_url)
-
-    #         except Exception as e:
-    #             _logger.error(f"Error processing image: {str(e)}")
-    #             return match.group(0)
-
-    #     def replace_image_url(login_params, image_url, db_name_local):
-    #         _logger.info('def replace_image_url---------------------')
-    #         try:
-    #             registry = api.Registry(db_name_local)
-    #             with registry.cursor() as cr:
-    #                 env = api.Environment(cr, SUPERUSER_ID, {})
-
-    #                 attachment = env['ir.attachment'].search(
-    #                     [('image_src', '=', image_url)], limit=1)
-    #                 _logger.info(f'attachment: {attachment}')
-
-    #                 if not attachment:
-    #                     return None
-                    
-    #                 attachment_data = base64.b64decode(attachment.datas)
-    #                 filename = attachment.name
-
-    #                 # Existing logic for replacing image URL
-    #                 new_url = self._upload_attachment_to_server(
-    #                     login_params, attachment_data, filename, image_url, domain, headers
-    #                 )
-                    
-    #                 if not new_url:
-    #                     # Nếu upload thất bại, ghi lại thông tin ảnh
-    #                     registry = api.Registry(db_name_local)
-    #                     with registry.cursor() as cr:
-    #                         env = api.Environment(cr, SUPERUSER_ID, {})
-    #                         env['failed.image.upload'].create({
-    #                             'blog_post_id': int(login_params["blog_post_id"]),
-    #                             'image_src': image_url,
-    #                             'retry_count': 0
-    #                         })
-    #                     return None
-
-    #                 return new_url
-
-    #         except Exception as e:
-    #                 # Ghi lại lỗi và tạo bản ghi upload thất bại
-    #             _logger.error(f"Error processing image URL {image_url}: {str(e)}")
-    #             registry = api.Registry(db_name_local)
-    #             with registry.cursor() as cr:
-    #                 env = api.Environment(cr, SUPERUSER_ID, {})
-    #                 env['failed.image.upload'].create({
-    #                     'blog_post_id': int(login_params["blog_post_id"]),
-    #                     'image_src': image_url,
-    #                     'retry_count': 0
-    #                 })
-    #             return None
-
-    #     def _is_local_image(domain, url):
-    #         _logger.info('def _is_local_image') # if return TRUE -> this image is not a local image
-    #         is_local = (domain in url or 
-    #                 "/website/static/src" in url or 
-    #                 "/web/image/website" in url)
-            
-    #         return is_local
-
-    #     def _update_image_tag(tag, new_url):
-    #         _logger.info('def _update_image_tag')
-    #         _logger.info(f'tag: {tag}')
-    #         _logger.info(f'new_tag: {new_url}')
-
-    #         updated_tag = re.sub(r'src="[^"]*"', f'src="{new_url}"', tag)
-    #         _logger.info(f'updated_tag_1: {updated_tag}')
-            
-    #         if 'data-original-src="' in updated_tag:
-    #             updated_tag = re.sub(
-    #                 r'data-original-src="[^"]*"', f'data-original-src="{new_url}"', updated_tag)
-    #         else:
-    #             updated_tag = updated_tag.replace(
-    #                 f'src="{new_url}"', f'src="{new_url}" data-original-src="{new_url}"')
-
-    #         _logger.info(f'updated_tag_2: {updated_tag}')
-    #         return updated_tag
-
-    #     # Process CSS and img tags
-    #     content = re.sub(r"url\('([^']+)'\)", 
-    #                      lambda m: replace_image(login_params, m, db_name_local), content)
-        
-    #     content = re.sub(r'<img\s+[^>]*src="([^"]+)"[^>]*>', 
-    #                      lambda m: replace_image(login_params, m, db_name_local), content)
-
-    #     # Update blog post content
-    #     self.call_external_api(
-    #         login_params, 
-    #         "blog.post", 
-    #         "write", 
-    #         {'content': content}, 
-    #         domain, 
-    #         headers, 
-    #         {}, 
-    #         int(login_params["blog_post_id"])
-    #     )
-        
-    #     _logger.info(f"Processing images for blog post id [{login_params['blog_post_id']}] was DONE")
 
     def _clean_content(self, content):
         _logger.info('def _clean_content')
@@ -298,8 +158,8 @@ class BlogController(http.Controller):
             "params": {
                 "model": model,
                 "method": method,
-                # "args": [[args]] if method != 'write' else [[id], args],
-                "args": [args] if method != "write" else [[id], args],
+                "args": [[args]] if method != 'write' else [[id], args],
+                #"args": [args] if method != "write" else [[id], args],
                 "kwargs": kwargs
             },
             "id": 2
@@ -357,10 +217,11 @@ class BlogController(http.Controller):
         try:
             # Validate required fields
             required_fields = [
-                'blog_folder', 'title', 'content', 'server_id',
+                'blog_folder', 'title', 'content',  'post_id', 'server_id',
                 'server_tag_ids', 'domain', 'database', 
                 'session', 'username', 'password', 'db_name_local'
             ]
+
             for field in required_fields:
                 if field not in kw:
                     return {
@@ -369,6 +230,35 @@ class BlogController(http.Controller):
                     }
 
             cleaned_content = self._clean_content(kw['content'])
+
+            # xu ly anh
+            attachment_posts = request.env['ir.attachment'].search([
+                ('res_model', '=', 'blog.post'),
+                ('res_id', '=', kw['post_id'])
+            ])
+            _logger.info(f'attachment_posts: {attachment_posts}')
+
+            if not attachment_posts:
+                _logger.info(f"Can't get any attachment in post with id: {kw['post_id']}")
+
+            for attachment_post in attachment_posts:
+                _logger.info(f'attachment_post: {attachment_post}')
+                existing_attachment_mappings = request.env['attachment.mapping'].search([
+                    ('local_attachment_id', '=', attachment_post.id),
+                    ('server_id', '=', kw['server_id'])
+                ])
+                _logger.info(f'existing_attachment_mappings: {existing_attachment_mappings}')
+
+                if not existing_attachment_mappings:
+                    _logger.info(f'Not found any attachment_mapping')
+
+                for attachment_mapping in existing_attachment_mappings:
+                    new_url = attachment_mapping['server_attachment_path']
+                    if attachment_post.image_src != new_url:
+                        attachment_post.write({'image_src': new_url})
+                        _logger.info(f"Updated attachment URL for ID {attachment_post.id}: {new_url}")
+
+                _logger.info('Success replace image_src!')
 
             if not kw['session']:
                 return {
@@ -389,16 +279,22 @@ class BlogController(http.Controller):
             }
 
             # Process blog folder
+            _logger.info(f"blog_folder: {kw['blog_folder']}")
+            _logger.info(f"domain: {kw['domain']}")
             blog_folder = self._process_blog_folder(login_params, kw['blog_folder'], kw['domain'], headers)
-            
+            _logger.info(f'blog_folder: {blog_folder}')
+
             # Process blog post
+            _logger.info('blog_post')
             blog_post = self._process_blog_post(
                 login_params, blog_folder, kw['title'], cleaned_content, kw['domain'], headers)
+            _logger.info(f'blog_post: {blog_post}')
 
             blog_post_id = blog_post["result"][0]['id']
 
             # Handle server tags
             try:
+                _logger.info('handle server_tag')
                 self.call_external_api(
                     login_params, 
                     "blog.post", 
@@ -417,13 +313,6 @@ class BlogController(http.Controller):
 
             # Prepare login parameters for image processing
             login_params.update({'blog_post_id': blog_post_id})
-            
-            # Start a separate thread for image processing
-            thread = threading.Thread(
-                target=self._process_images_in_content,
-                args=(login_params, cleaned_content, kw['domain'], headers, kw['db_name_local'])
-            )
-            thread.start()
 
             return {
                 "message": "Blog post created successfully",
