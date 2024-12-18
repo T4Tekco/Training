@@ -1,3 +1,4 @@
+import ast
 import logging
 import threading
 import base64
@@ -5,7 +6,6 @@ import hashlib
 import html
 import re
 import requests
-
 from odoo import http, api, SUPERUSER_ID
 from odoo.http import request
 
@@ -89,7 +89,8 @@ class BlogController(http.Controller):
                 return None
 
             # Get the attachment ID from the response
-            attachment_server_id = attachment_response.get('result')
+            attachment_server_id = attachment_response.get('result')[0]
+            _logger.info(f'attachment_server_id: {attachment_server_id}')
             
             if not attachment_server_id:
                 _logger.error("No attachment ID found in response")
@@ -100,10 +101,11 @@ class BlogController(http.Controller):
                 login_params,                 
                 "ir.attachment",                 
                 "read",                 
-                [attachment_server_id],                  
+                attachment_server_id,                  
                 domain,                 
                 headers             
-            )         
+            )        
+            #_logger.info(f'attachment_detail: {attachment_detail}') 
 
             if not attachment_detail or 'result' not in attachment_detail:
                 _logger.error(f"Failed to get attachment details for {attachment_server_id}")
@@ -211,124 +213,6 @@ class BlogController(http.Controller):
                 'message': str(e)
             }
 
-    @http.route('/api/create/blog', type='json', auth='user', methods=["POST"], csrf=False)
-    def create_blog(self, **kw):
-        _logger.info('API create_blog is called...')
-        try:
-            # Validate required fields
-            required_fields = [
-                'blog_folder', 'title', 'content',  'post_id', 'server_id',
-                'server_tag_ids', 'domain', 'database', 
-                'session', 'username', 'password', 'db_name_local'
-            ]
-
-            for field in required_fields:
-                if field not in kw:
-                    return {
-                        "message": f"Missing required field: {field}",
-                        "status": "error"
-                    }
-
-            cleaned_content = self._clean_content(kw['content'])
-
-            # xu ly anh
-            attachment_posts = request.env['ir.attachment'].search([
-                ('res_model', '=', 'blog.post'),
-                ('res_id', '=', kw['post_id'])
-            ])
-            _logger.info(f'attachment_posts: {attachment_posts}')
-
-            if not attachment_posts:
-                _logger.info(f"Can't get any attachment in post with id: {kw['post_id']}")
-
-            for attachment_post in attachment_posts:
-                _logger.info(f'attachment_post: {attachment_post}')
-                existing_attachment_mappings = request.env['attachment.mapping'].search([
-                    ('local_attachment_id', '=', attachment_post.id),
-                    ('server_id', '=', kw['server_id'])
-                ])
-                _logger.info(f'existing_attachment_mappings: {existing_attachment_mappings}')
-
-                if not existing_attachment_mappings:
-                    _logger.info(f'Not found any attachment_mapping')
-
-                for attachment_mapping in existing_attachment_mappings:
-                    new_url = attachment_mapping['server_attachment_path']
-                    if attachment_post.image_src != new_url:
-                        attachment_post.write({'image_src': new_url})
-                        _logger.info(f"Updated attachment URL for ID {attachment_post.id}: {new_url}")
-
-                _logger.info('Success replace image_src!')
-
-            if not kw['session']:
-                return {
-                    "message": "Login failed, incorrect username or password!",
-                    "status": "error"
-                }
-
-            headers = {
-                'Content-Type': 'application/json',
-                'Cookie': f"session_id={kw['session']}"
-            }
-            login_params = {
-                'database': kw['database'],
-                'username': kw['username'],
-                'password': kw['password'],
-                'db_name_local': kw['db_name_local'],
-                'server_id': kw['server_id']
-            }
-
-            # Process blog folder
-            _logger.info(f"blog_folder: {kw['blog_folder']}")
-            _logger.info(f"domain: {kw['domain']}")
-            blog_folder = self._process_blog_folder(login_params, kw['blog_folder'], kw['domain'], headers)
-            _logger.info(f'blog_folder: {blog_folder}')
-
-            # Process blog post
-            _logger.info('blog_post')
-            blog_post = self._process_blog_post(
-                login_params, blog_folder, kw['title'], cleaned_content, kw['domain'], headers)
-            _logger.info(f'blog_post: {blog_post}')
-
-            blog_post_id = blog_post["result"][0]['id']
-
-            # Handle server tags
-            try:
-                _logger.info('handle server_tag')
-                self.call_external_api(
-                    login_params, 
-                    "blog.post", 
-                    "write", 
-                    {'tag_ids': [(6, 0, kw.get('server_tag_ids'))]}, 
-                    kw['domain'], 
-                    headers, 
-                    {}, 
-                    blog_post_id
-                )
-            except Exception as e:
-                return {
-                    "message": f"Error adding server tag {str(e)}",
-                    "status": "error"
-                }
-
-            # Prepare login parameters for image processing
-            login_params.update({'blog_post_id': blog_post_id})
-
-            return {
-                "message": "Blog post created successfully",
-                "status": "success",
-                "data": {
-                    "blog_post_server_id": blog_post_id
-                }
-            }
-
-        except Exception as e:
-            _logger.error(f"Error creating blog post: {str(e)}")
-            return {
-                "message": f"Error creating blog post: {str(e)}",
-                "status": "error"
-            }
-
     def _process_blog_folder(self, login_params, blog_folder_name, domain, headers):
         blog_folder = self.call_external_api(
             login_params, 
@@ -353,6 +237,37 @@ class BlogController(http.Controller):
             blog_folder["result"] = [{"id": blog_folder["result"][0]}]
 
         return blog_folder
+
+    def check_server_attachment_by_id(self, login_params, server_attachment_id, server_id, domain, headers):
+        _logger.info('def check_server_attachment_by_id')
+        try:
+            attachment_server_mapping = request.env['attachment.mapping'].search([
+                ('server_attachment_id', '=', server_attachment_id),
+                ('server_id', '=', server_id)
+            ])
+            _logger.info(f'attachment_server_mapping: {attachment_server_mapping}')
+            
+            if not attachment_server_mapping:
+                _logger.info(f"Don't have attachment in mapping with attachment_id {server_attachment_id} and server_id {server_id}")
+
+            server_attachment = self.call_external_api(
+                login_params,
+                "ir.attachment",
+                "search_read",
+                ["id", "=", server_attachment_id],
+                domain,
+                headers,
+                {"fields": ["image_src"]}
+            )
+
+            if not server_attachment:
+                _logger.info(f"Can't get any server_attachment with attachment_id: {server_attachment_id}")
+
+            _logger.info(f'Server_attachment: {server_attachment}')
+            return None
+        except Exception as e:
+            _logger.info(f'Error when get attachment on server with attachment_id: {server_attachment_id} and error: {str(e)}')
+            return None
 
     def _process_blog_post(self, login_params, blog_folder, title, cleaned_content, domain, headers):
         blog_post = self.call_external_api(
@@ -396,3 +311,230 @@ class BlogController(http.Controller):
             )
 
         return blog_post
+    
+    def get_all_attachment_mapping(self):
+        _logger.info('def get_all_attachment_mapping')
+        try:
+            attachment_mapping = request.env['attachment.mapping'].search([])
+            _logger.info(f'attachment_mapping: {attachment_mapping}')
+
+            if not attachment_mapping:
+                _logger.info("Can't get attachment_mapping")
+
+            return attachment_mapping
+        except Exception as e:
+            _logger.info(f'Error when get attachment mapping: {str(e)}')
+    
+    def upload_attachment(self, upload_attachment):
+        _logger.info(f'def upload_attachment')
+        
+        try:
+            attachment = upload_attachment.local_attachment_id
+            server = upload_attachment.server_id
+
+            _logger.info(f'attachment: {attachment}, server: {server}')
+
+            login_params={
+                    'database': server.database,
+                    'username': server.username,
+                    'password': server.password,
+                    'db_name_local': request.env.cr.dbname,
+                    'server_id': server.id
+            }
+            _logger.info(f'login_params: {login_params}')
+            attachment_data = base64.b64decode(attachment.datas)
+            _logger.info('attachment_data')
+
+            headers = {
+                'Content-Type': 'application/json',
+                'Cookie': f"session_id={server.session}"
+            }
+
+            attachment_response = self._upload_attachment_to_server(
+                login_params,
+                attachment_data=attachment_data,
+                filename=attachment.name,
+                domain=server.domain,
+                headers=headers
+            )
+            
+            _logger.info(f"attachment_response['result']: {attachment_response['result']}")
+
+            if not attachment_response:
+                _logger.warning(f"Upload attachment failed!")
+
+            server_attachment_path = self._get_attachment_url_path(login_params,
+                                                                                attachment_response, 
+                                                                                server.domain, 
+                                                                                headers)
+           
+            # Create mapping record
+            new_attachment_mapping = request.env['attachment.mapping'].create({
+                'server_attachment_id': attachment_response['result'],
+                'server_attachment_path': server_attachment_path,
+                'local_attachment_id': attachment.id,
+                'server_id': server.id
+            })
+
+            _logger.info(f'Create ATTACHMENT.MAPPING success: {new_attachment_mapping}')
+            #records_to_unlink.append(record)
+            
+            upload_attachment.unlink()
+            _logger.info(f'Unlink success upload_attachment')
+
+        except Exception as e:
+            _logger.error(f"Error uploading attachment {upload_attachment.local_attachment_id.name}: {str(e)}")
+
+    def _process_image_urls(self, login_params, post_id, server_id, domain, headers):
+        _logger.info('def _process_image_urls')
+        try:
+            attachment_posts = request.env['ir.attachment'].search([
+                ('res_model', '=', 'blog.post'),
+                ('res_id', '=', post_id)
+            ])
+            _logger.info(f'Total attachments found: {len(attachment_posts)}')
+
+            for attachment_post in attachment_posts:
+                _logger.info(f'Processing attachment: {attachment_post.name}')
+                
+                # Kiểm tra mapping hiện tại 
+                existing_attachment_mappings = request.env['attachment.mapping'].search([
+                    ('local_attachment_id', '=', attachment_post.id),
+                    ('server_id', '=', server_id)
+                ])
+                _logger.info(f'existing_attachment_mappings: {existing_attachment_mappings}')
+
+                # Luôn tạo attachment upload để đảm bảo upload
+                new_upload_attachment = request.env['attachment.upload'].create({
+                    'local_attachment_id': attachment_post.id,
+                    'server_id': server_id
+                })
+
+                # Nếu chưa có mapping, thực hiện upload
+                if not existing_attachment_mappings:
+                    _logger.info('No existing attachment mappings, uploading...')
+                    try:
+                        self.upload_attachment(new_upload_attachment)
+                    except Exception as e:
+                        _logger.error(f'Upload failed for {attachment_post.name}: {e}')
+                        continue
+
+                # Cập nhật URL cho tất cả các attachment
+                for attachment_mapping in existing_attachment_mappings:
+                    new_url = attachment_mapping.server_attachment_path
+                    _logger.info(f'New URL for {attachment_post.name}: {new_url}')
+
+                    server_attachment_id_list = ast.literal_eval(attachment_mapping.server_attachment_id)
+                    server_att_id = server_attachment_id_list[0]
+                    server_mapping_id = attachment_mapping.server_id['id']
+
+                    # check attachment is exist on server
+                    self.check_server_attachment_by_id(login_params, server_att_id,
+                                                        server_mapping_id, domain, headers)
+
+                    if new_url:
+                        # Kiểm tra URL và cập nhật
+                        try:
+                            attachment_post.write({
+                                'image_src': new_url
+                            })
+                            _logger.info(f'Successfully updated image_src for {attachment_post.name}')
+                        except Exception as e:
+                            _logger.error(f'Failed to update image_src: {e}')
+                    else:
+                        _logger.warning(f'No valid server attachment path for {attachment_post.name}')
+
+        except Exception as e:
+            _logger.error(f'Error processing image URLs: {e}')
+
+    @http.route('/api/create/blog', type='json', auth='user', methods=["POST"], csrf=False)
+    def create_blog(self, **kw):
+        _logger.info('API create_blog is called...')
+        try:                        
+
+            # Validate required fields
+            required_fields = [
+                'blog_folder', 'title', 'content',  'post_id', 'server_id',
+                'server_tag_ids', 'domain', 'database', 
+                'session', 'username', 'password', 'db_name_local'
+            ]
+
+            for field in required_fields:
+                if field not in kw:
+                    return {
+                        "message": f"Missing required field: {field}",
+                        "status": "error"
+                    }
+
+            if not kw['session']:
+                return {
+                    "message": "Login failed, incorrect username or password!",
+                    "status": "error"
+                }
+
+            headers = {
+                'Content-Type': 'application/json',
+                'Cookie': f"session_id={kw['session']}"
+            }
+            login_params = {
+                'database': kw['database'],
+                'username': kw['username'],
+                'password': kw['password'],
+                'db_name_local': kw['db_name_local'],
+                'server_id': kw['server_id']
+            }
+
+            cleaned_content = self._clean_content(kw['content'])
+
+            # xu ly anh
+            self._process_image_urls(login_params, kw['post_id'], kw['server_id'], kw['domain'], headers)
+
+            # Process blog folder
+            blog_folder = self._process_blog_folder(login_params, kw['blog_folder'], kw['domain'], headers)
+            _logger.info(f'blog_folder: {blog_folder}')
+
+            # Process blog post
+            blog_post = self._process_blog_post(
+                login_params, blog_folder, kw['title'], cleaned_content, kw['domain'], headers)
+            _logger.info(f'blog_post: {blog_post}')
+
+            blog_post_id = blog_post["result"][0]['id']
+
+            # Handle server tags 
+            try:
+                _logger.info('handle server_tag')
+                self.call_external_api(
+                    login_params, 
+                    "blog.post", 
+                    "write", 
+                    {'tag_ids': [(6, 0, kw.get('server_tag_ids'))]}, 
+                    kw['domain'], 
+                    headers, 
+                    {}, 
+                    blog_post_id
+                )
+            except Exception as e:
+                return {
+                    "message": f"Error adding server tag {str(e)}",
+                    "status": "error"
+                }
+
+            # Prepare login parameters for image processing
+            login_params.update({'blog_post_id': blog_post_id})
+
+            _logger.info('SUCCESS TRANSFER BLOG')
+
+            return {
+                "message": "Blog post created successfully",
+                "status": "success",
+                "data": {
+                    "blog_post_server_id": blog_post_id
+                }
+            }
+
+        except Exception as e:
+            _logger.error(f"Error creating blog post: {str(e)}")
+            return {
+                "message": f"Error creating blog post: {str(e)}",
+                "status": "error"
+            }
