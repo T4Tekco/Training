@@ -160,11 +160,9 @@ class DatabaseController(http.Controller):
                 "status": "error"
             }
 
-        # Xây dựng Doamain để lấy danh sách database
         url = f"{kw['domain']}/web/database/list"
 
         try:
-            # Gửi yêu cầu POST tới server
             response = requests.post(
                 url, json={"jsonrpc": "2.0", "method": "call", "params": {}})
 
@@ -176,7 +174,7 @@ class DatabaseController(http.Controller):
                         "status": "success",
                         "databases": result
                     }
-
+            
             return {
                 "message": "No databases found, Could you check the domain is correct?",
                 "status": "error"
