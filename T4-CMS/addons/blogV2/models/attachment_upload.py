@@ -102,8 +102,10 @@ class AttachmentUpload(models.Model):
                                 attachment_id = attachment.id
 
                                 existing_att_mapping = self._get_attachment_mappings(attachment_id, server_id)
-
-                                #existing_upload_att = self._get_attachment_uploads(attachment_id, server_id)
+                                existing_att_id = existing_att_mapping.local_attachment_id
+                                existing_server_id = existing_att_mapping.server_id
+                                _logger.info(f'existing_att_id: {existing_att_id}')
+                                _logger.info(f'existing_server_id: {existing_server_id}')
 
                                 # if not existing_attachment_mapping
                                 if not existing_att_mapping:
@@ -118,81 +120,15 @@ class AttachmentUpload(models.Model):
         except Exception as e:
             _logger.info(f'Error when process attachment in transfer blog cron-job: {str(e)}')
             return None
-
-    def upload_attachment(self, upload_attachment):
-        _logger.info(f'def upload_attachment')
         
-        try:
-            attachment = upload_attachment.local_attachment_id
-            server = upload_attachment.server_id
 
-            login_params={
-                    'database': server.database,
-                    'username': server.username,
-                    'password': server.password,
-                    'db_name_local': self.env.cr.dbname,
-                    'server_id': server.id
-            }
-            _logger.info(f'login_params: {login_params}')
-            attachment_data = base64.b64decode(attachment.datas)
-            _logger.info('attachment_data')
-
-            headers = {
-                'Content-Type': 'application/json',
-                'Cookie': f"session_id={server.session}"
-            }
-
-            blog_controller = BlogController()
-            _logger.info(f'blog_controller: {blog_controller}')
-
-            attachment_response = blog_controller._upload_attachment_to_server(
-                login_params,
-                attachment_data=attachment_data,
-                filename=attachment.name,
-                domain=server.domain,
-                headers=headers
-            )
-
-            if not attachment_response:
-                _logger.warning(f"Upload attachment failed!")
-
-            server_attachment_path = blog_controller._get_attachment_url_path(login_params,
-                                                                                attachment_response, 
-                                                                                server.domain, 
-                                                                                headers)
-           
-            # Create mapping record
-            new_attachment_mapping = self.env['attachment.mapping'].create({
-                'server_attachment_id': attachment_response or '',
-                'server_attachment_path': server_attachment_path,
-                'local_attachment_id': attachment.id,
-                'server_id': server.id
-            })
-
-            _logger.info(f'Create ATTACHMENT.MAPPING success: {new_attachment_mapping}')
-            #records_to_unlink.append(record)
-            
-            upload_attachment.unlink()
-            _logger.info(f'Unlink success upload_attachment')
-
-        except Exception as e:
-            _logger.error(f"Error uploading attachment {upload_attachment.local_attachment_id.name}: {str(e)}")
-
-
-    def get_all_attachment_mapping(self):
-        try:
-            attachment_mapping = request.env['attachment.mapping'].search([])
-            _logger.info(f'attachment_mapping: {attachment_mapping}')
-
-            return attachment_mapping
-        except Exception as e:
-            _logger.info(f'Error when get attachment mapping: {str(e)}')
 
     @api.model
     def cron_upload_attachments(self):
         _logger.info(f'def cron_upload_attachments')
+        blogController = BlogController()
 
-        self.get_all_attachment_mapping()
+        blogController.get_all_attachment_mapping()
  
         self.process_attachment_transfer_blog()  # Generate new upload records
         attachments_upload_records = self.search([])  # Get all pending upload records
@@ -200,4 +136,4 @@ class AttachmentUpload(models.Model):
             _logger.info(f'Attachment_upload_record was found with length: {len(attachments_upload_records)}')
 
         for attachment_upload in attachments_upload_records:
-            self.upload_attachment(attachment_upload)  # Upload attachments
+            blogController.upload_attachment(attachment_upload)  # Upload attachments
